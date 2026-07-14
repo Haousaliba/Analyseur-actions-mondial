@@ -1,0 +1,28 @@
+name: Analyseur Sectoriel Continu
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # S'exécute automatiquement TOUTES LES HEURES, 24h/24
+  workflow_dispatch:     # Ajoute un bouton manuel pour lancer le scan quand tu veux
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le code du dépôt
+        uses: actions/checkout@v3
+
+      - name: Configurer Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Installer les bibliothèques boursières
+        run: |
+          pip install yfinance pandas requests lxml
+
+      - name: Exécuter l'Analyse Mondiale
+        env:
+          TOKEN_TELEGRAM: ${{ secrets.TOKEN_TELEGRAM }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: python bot.py
