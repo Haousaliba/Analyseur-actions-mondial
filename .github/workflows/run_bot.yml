@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Récupérer le code du dépôt
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4  # Mise à jour de v3 à v4 🚀
 
       - name: Configurer Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5  # Mise à jour de v4 à v5 🚀
         with:
           python-version: '3.10'
 
