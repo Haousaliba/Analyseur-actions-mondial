@@ -3,17 +3,17 @@ name: Analyseur Sectoriel Continu
 on:
   schedule:
     - cron: '0 * * * *'  # S'exécute automatiquement TOUTES LES HEURES, 24h/24
-  workflow_dispatch:     # Ajoute un bouton manuel pour lancer le scan quand tu veux
+  workflow_dispatch:     # Permet de lancer le scan manuellement quand tu veux
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
     steps:
       - name: Récupérer le code du dépôt
-        uses: actions/checkout@v4  # Mise à jour de v3 à v4 🚀
+        uses: actions/checkout@v4  # Passer à @v4 utilise Node.js 20/24 proprement 🚀
 
       - name: Configurer Python
-        uses: actions/setup-python@v5  # Mise à jour de v4 à v5 🚀
+        uses: actions/setup-python@v5  # Passer à @v5 utilise Node.js 20/24 proprement 🚀
         with:
           python-version: '3.10'
 
