@@ -105,6 +105,8 @@ def recuperer_radar_mondial():
     return list(set([str(t).replace('.', '-') if not any(e in str(t) for e in ['.AX', '.PA', '.AS', '.DE', '.T']) else str(t) for t in tickers]))
 
 if __name__ == "__main__":
+    envoyer_alerte_telegram("⚠️ TEST : Le bot GitHub Actions fonctionne et communique parfaitement avec Telegram !")
+    print("✅ Message de test envoyé !")
     radar = recuperer_radar_mondial()
     print(f"🎯 {len(radar)} actions mondiales chargées.")
     
