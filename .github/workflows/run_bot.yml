@@ -2,15 +2,9 @@ name: Analyseur Sectoriel Continu
 
 on:
   schedule:
-    # 2h avant Sydney (21h00 UTC, soit 21h00 heure de Paris en hiver, à ajuster selon l'heure d'été)
-    - cron: '0 21 * * 1-5'
-    # 2h avant Tokyo (00h00 UTC, soit 00h00 heure de Paris)
-    - cron: '0 0 * * 1-5'
-    # 2h avant l'Europe (07h00 heure de Paris, soit 07h00 UTC ou 05h00 UTC selon l'heure d'été. En UTC standard : 07:00)
-    - cron: '0 7 * * 1-5'
-    # 2h avant Wall Street (13h30 heure de Paris, soit 13h30 UTC ou 11h30 UTC. En UTC standard : 13:30)
-    - cron: '30 13 * * 1-5'
-  workflow_dispatch:
+    # Exécution toutes les 4 heures, du lundi au vendredi
+    - cron: '0 */4 * * 1-5'
+  workflow_dispatch: # Permet de le lancer manuellement quand tu veux
 
 jobs:
   run-bot:
@@ -26,7 +20,7 @@ jobs:
 
       - name: Installer les bibliothèques
         run: |
-          pip install yfinance pandas ta requests
+          pip install yfinance pandas ta requests lxml html5lib
 
       - name: Exécuter l'Analyse Mondiale
         env:
