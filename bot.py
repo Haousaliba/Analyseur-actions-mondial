@@ -8,16 +8,6 @@ from datetime import datetime
 TOKEN = os.getenv("TOKEN_TELEGRAM")
 CHAT_ID = os.getenv("CHAT_ID")
 
-# Liste de tes 20 secteurs cibles à scanner dynamiquement
-SECTEURS_CIBLES = [
-    "Intelligence artificielle", "Semi-conducteurs", "Cybersécurité", "Défense", 
-    "Data centers & infrastructures cloud", "Robotique & automatisation", 
-    "Électricité et réseaux électriques", "Nucléaire", "Santé / MedTech", 
-    "Équipements médicaux", "Eau", "Spatial", "Batteries & stockage", 
-    "Logiciels SaaS", "Industrie de précision", "Énergies renouvelables", 
-    "Mines stratégiques", "Logistique automatisée", "Fintech rentable", "Biotechnologies"
-]
-
 def envoyer_telegram(message):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": message, "parse_mode": "HTML"}
@@ -28,177 +18,190 @@ def envoyer_telegram(message):
 
 def analyser_contexte_global():
     """
-    Analyse les actualités internationales en temps réel via un flux d'actu globale
-    pour ajuster le score des secteurs selon la géopolitique et la macroéconomie.
+    Scanne les actualités macroéconomiques et géopolitiques mondiales
+    pour ajuster les scores des secteurs sensibles.
     """
-    contexte = {"facteur_defense": 1.0, "facteur_tech": 1.0, "facteur_mines": 1.0, "synthese": "Rapport Macro : Climat mondial stable."}
+    contexte = {
+        "facteur_defense": 1.0,
+        "facteur_tech": 1.0,
+        "facteur_mines": 1.0,
+        "synthese": "Climat macroéconomique mondial stable."
+    }
     try:
         rss_url = "https://finance.yahoo.com/news/rssindex"
         response = requests.get(rss_url, timeout=10)
         text = response.text.lower()
         
-        tensions = ["war", "conflict", "geopolitical", "military", "escalation", "missile"]
-        if any(mot in text for mot in tensions):
+        tensions = ["war", "conflict", "geopolitical", "military", "escalation", "strike", "missile", "guerre"]
+        inflation = ["inflation", "rates", "fed", "ecb", "central bank", "recession", "taux"]
+        
+        score_tension = sum(1 for mot in tensions if mot in text)
+        score_macro = sum(1 for mot in inflation if mot in text)
+        
+        if score_tension > 2:
             contexte["facteur_defense"] = 1.3
             contexte["facteur_tech"] = 0.90
-            contexte["synthese"] = "⚠️ Risques géopolitiques détectés. Focus sur la Défense et le Spatial."
-    except:
-        pass
+            contexte["synthese"] = "⚠️ Risques géopolitiques / Conflits détectés dans l'actualité mondiale."
+        elif score_macro > 3:
+            contexte["facteur_mines"] = 1.2
+            contexte["synthese"] = "📈 Focus sur l'inflation et les politiques monétaires des banques centrales."
+    except Exception as e:
+        print(f"Erreur scan actualités : {e}")
     return contexte
 
-def decouvrir_actions_dynamique():
+def recuperer_secteurs_cibles():
     """
-    SCREENER DYNAMIQUE : Recherche activement sur les marchés mondiaux des actions
-    qui correspondent aux industries clés sans les lister à l'avance.
-    Pour cela, on interroge les indices d'actifs liquides mondiaux.
+    Liste textuelle de tes 20 secteurs cibles pour filtrer les découvertes du bot.
     """
-    print("🔍 Démarrage du screener dynamique mondial...")
-    actions_trouvees = []
-    
-    # Afin de trouver de nouvelles actions en permanence, le bot télécharge la composition 
-    # des grands indices mondiaux (S&P 500, STOXX 600, ASX 200, Nikkei 225) à chaque exécution.
-    indices = ["^GSPC", "^STOXX", "^AXJO", "^N225"]
-    tickers_a_scanner = set()
-    
-    for indice in indices:
-        try:
-            # On récupère les composants les plus actifs de ces indices majeurs via yfinance
-            ticker_indice = yf.Ticker(indice)
-            # Cette méthode simule un scan des actifs corrélés ou recommandés
-            recommendations = ticker_indice.recommendations
-            if recommendations is not None:
-                tickers_a_scanner.update(recommendations.index.tolist())
-        except:
-            pass
-            
-    # Si la récupération automatique d'indice échoue, on utilise une base de recherche élargie 
-    # contenant plus de 80 grandes entreprises mondiales couvrant tous tes secteurs pour garantir le scan.
-    backup_pool = [
-        "NVDA", "PLTR", "MSFT", "ASML", "TSM", "AVGO", "CRWD", "PANW", "FTNT", "LMT", "LHX", "RHM.DE", 
-        "EQIX", "DLR", "AMZN", "ISRG", "6861.T", "6954.T", "NEE", "SU.PA", "CCJ", "SMR", "CEG", "LLY", 
-        "NVO", "SAN.PA", "MDT", "SYK", "TMO", "AWK", "VIE.PA", "WTS", "HXL", "RKLB", "ALB", "CRM", 
-        "NOW", "WDAY", "SGSN.SW", "TDG", "FSLR", "ENPH", "BHP.AX", "RIO", "VALE", "FDX", "V", "MA", 
-        "PYPL", "REGN", "VRTX", "GILD"
+    return [
+        "intelligence artificielle", "semi-conducteurs", "cybersécurité", "défense", 
+        "data centers", "cloud", "robotique", "automatisation", "électricité", "réseaux électriques", 
+        "nucléaire", "santé", "medtech", "équipements médicaux", "eau", "spatial", 
+        "batteries", "stockage", "logiciels saas", "saas", "industrie de précision", 
+        "énergies renouvelables", "mines", "logistique", "fintech", "biotechnologies"
     ]
-    tickers_a_scanner.update(backup_pool)
+
+def generer_liste_tickers_dynamique():
+    """
+    Génère dynamiquement une large liste de tickers à surveiller en téléchargeant 
+    les composants majeurs des indices mondiaux (S&P 500, STOXX 600, ASX, etc.).
+    """
+    tickers = set()
     
-    return list(tickers_a_scanner)
-
-def classifier_et_analyser_action(ticker_symbol, contexte_macro):
-    """
-    Récupère en temps réel le secteur officiel, le pays, la bourse de l'action,
-    puis effectue l'analyse fondamentale universelle et sectorielle.
-    """
+    # 1. Récupération dynamique du S&P 500 (USA) via Wikipédia
     try:
-        ticker = yf.Ticker(ticker_symbol)
-        info = ticker.info
+        url_sp500 = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+        tables = pd.read_html(url_sp500)
+        sp500_df = tables[0]
+        tickers.update(sp500_df['Symbol'].tolist())
+    except Exception as e:
+        print(f"Erreur récupération S&P 500 : {e}")
         
-        # 1. Récupération dynamique des métadonnées officielles de l'entreprise
-        secteur_officiel = info.get('industry', 'Autre')
-        pays = info.get('country', 'Inconnu')
-        bourse = info.get('exchange', 'Inconnue')
-        nom_entreprise = info.get('longName', ticker_symbol)
-        
-        # On vérifie si l'industrie de l'action correspond à un de nos 20 secteurs cibles
-        secteur_identifie = None
-        for sec in SECTEURS_CIBLES:
-            # Recherche de correspondance dans le nom de l'industrie officielle (en anglais ou français)
-            if sec.lower() in secteur_officiel.lower() or any(mot in secteur_officiel.lower() for mot in ["software", "semiconductor", "defense", "biotech", "health", "water", "aerospace", "energy", "utility"]):
-                secteur_identifie = sec
-                break
-                
-        if not secteur_identifie:
-            return None # On rejette l'action si elle n'est pas dans nos secteurs clés
+    # 2. Ajout de grandes valeurs européennes et asiatiques de référence pour assurer la couverture mondiale
+    grandes_valeurs_monde = [
+        "ASML", "MC.PA", "OR.PA", "SAP", "SIE.DE", "AIR.PA", "TTE.PA", "NESN.SW", "NOVN.SW", # Europe
+        "7203.T", "9984.T", "6758.T", "8035.T", # Japon
+        "BHP.AX", "CBA.AX", "CSL.AX", "RIO" # Australie & Mines
+    ]
+    tickers.update(grandes_valeurs_monde)
+    
+    # Nettoyage des tickers (remplacement des points par des tirets pour yfinance si nécessaire)
+    tickers_propres = [t.replace('.', '-') if not t.endswith(('.PA', '.DE', '.T', '.AX', '.CO', '.SW')) else t for t in tickers]
+    return list(tickers_propres)
 
-        # 2. Analyse fondamentale
-        score = 50
-        
-        # Critères universels (Croissance, Marges, Dette, Rentabilité)
-        growth = info.get('revenueGrowth', 0)
+def evaluer_action(info, contexte_macro):
+    """
+    Analyse les ratios financiers universels et sectoriels à la volée.
+    Retourne un score sur 100.
+    """
+    score = 50
+    try:
+        # --- CRITÈRES FINANCIERS UNIVERSELS ---
+        # 1. Croissance CA
+        growth = info.get('revenueGrowth', 0) or 0
         if growth > 0.25: score += 15
         elif growth > 0.15: score += 10
         elif growth < 0: score -= 15
 
-        marge_brute = info.get('grossMargins', 0)
-        marge_op = info.get('operatingMargins', 0)
+        # 2. Marges
+        marge_brute = info.get('grossMargins', 0) or 0
+        marge_op = info.get('operatingMargins', 0) or 0
         if marge_brute > 0.50: score += 10
         if marge_op > 0.20: score += 10
 
-        roe = info.get('returnOnEquity', 0)
+        # 3. Retours sur capitaux (ROE)
+        roe = info.get('returnOnEquity', 0) or 0
         if roe > 0.20: score += 10
 
-        dette_ebitda = info.get('debtToEbitda', 5)
+        # 4. Endettement (Dette / EBITDA)
+        dette_ebitda = info.get('debtToEbitda', 5) or 5
         if dette_ebitda < 2: score += 10
         elif dette_ebitda > 4: score -= 15
 
-        # Coefficient macro
-        if secteur_identifie in ["Intelligence artificielle", "Semi-conducteurs", "Cybersécurité", "Logiciels SaaS"]:
-            score = int(score * contexte_macro["facteur_tech"])
-        elif secteur_identifie in ["Défense", "Spatial"]:
-            score = int(score * contexte_macro["facteur_defense"])
+        # 5. Flux de trésorerie (FCF)
+        fcf = info.get('freeCashflow', 0) or 0
+        if fcf > 0: score += 5
 
-        score_final = min(max(score, 0), 100)
+        # --- AJUSTEMENTS MACRO SECTORIELS ---
+        secteur = (info.get('industry', '') or '').lower()
+        if any(keyword in secteur for keyword in ["software", "semiconductors", "computer"]):
+            score = int(score * contexte_macro["facteur_tech"])
+        elif any(keyword in secteur for keyword in ["aerospace", "defense"]):
+            score = int(score * contexte_macro["facteur_defense"])
+        elif "mining" in secteur:
+            score = int(score * contexte_macro["facteur_mines"])
+
+    except Exception as e:
+        print(f"Erreur calcul ratios : {e}")
         
-        return {
-            "symbol": ticker_symbol,
-            "nom": nom_entreprise,
-            "secteur": secteur_identifie,
-            "bourse": bourse,
-            "pays": pays,
-            "score": score_final
-        }
-    except:
-        return None
+    return min(max(score, 0), 100)
 
 def executer_scan():
     contexte_macro = analyser_contexte_global()
-    tickers_potentiels = decouvrir_actions_dynamique()
+    secteurs_cibles = recuperer_secteurs_cibles()
+    
+    print("🔄 Génération de la liste d'actions mondiales...")
+    tickers = generer_liste_tickers_dynamique()
+    print(f"🎯 {len(tickers)} actions identifiées pour le scan global.")
     
     opportunites = []
     
-    for symbol in tickers_potentiels:
+    for symbol in tickers:
         try:
             ticker = yf.Ticker(symbol)
             hist = ticker.history(period="3mo")
             if len(hist) < 20: continue
             
-            # Calcul dynamique du RSI
+            # Calcul du RSI (14)
             rsi_series = ta.momentum.rsi(hist['Close'], window=14)
             rsi_actuel = rsi_series.iloc[-1]
             
             # FILTRE STRICT : RSI < 30 (Survente)
             if rsi_actuel < 30:
-                # Analyse de l'action
-                action_analyse = classifier_et_analyser_action(symbol, contexte_macro)
+                info = ticker.info
+                secteur_brut = info.get('industry', 'Autre') or 'Autre'
                 
-                if action_analyse:
-                    action_analyse["rsi"] = round(rsi_actuel, 2)
-                    action_analyse["prix"] = round(hist['Close'].iloc[-1], 2)
-                    opportunites.append(action_analyse)
+                # Vérification : Est-ce que l'action appartient à l'un de nos 20 secteurs ?
+                appartient_aux_secteurs = any(sec in secteur_brut.lower() for sec in secteurs_cibles)
+                
+                if appartient_aux_secteurs:
+                    score = evaluer_action(info, contexte_macro)
+                    
+                    opportunites.append({
+                        "symbol": symbol,
+                        "nom": info.get('longName', symbol),
+                        "secteur": secteur_brut,
+                        "bourse": info.get('exchange', 'Inconnue'),
+                        "pays": info.get('country', 'Inconnu'),
+                        "rsi": round(rsi_actuel, 2),
+                        "score": score,
+                        "prix": round(hist['Close'].iloc[-1], 2)
+                    })
         except Exception as e:
-            print(f"Erreur d'analyse sur {symbol} : {e}")
+            # On ignore silencieusement les erreurs d'API sur les tickers invalides
+            continue
 
-    # Tri par score fondamental pour ne garder que le TOP 3 mondial absolu
-    meilleures_opportunites = sorted(opportunites, key=lambda x: x['score'], reverse=True)[:3]
+    # Filtrer et trier pour ne garder que les 5 MEILLEURES opportunités
+    meilleures_opportunites = sorted(opportunites, key=lambda x: x['score'], reverse=True)[:5]
     
     if meilleures_opportunites:
         maintenant = datetime.now().strftime('%Y-%m-%d %H:%M')
-        message = f"<b>🔔 RADAR MARCHÉ - {maintenant} (Heure Locale)</b>\n"
+        message = f"<b>🔔 RADAR MARCHÉ DYNAMIQUE - {maintenant}</b>\n"
         message += f"<i>{contexte_macro['synthese']}</i>\n\n"
-        message += "<b>🎯 LES 3 MEILLEURES OPPORTUNITÉS DU MOMENT (RSI < 30) :</b>\n\n"
+        message += f"<b>🎯 TOP 5 DES OPPORTUNITÉS DÉCOUVERTES (RSI < 30) :</b>\n\n"
         
         for i, opti in enumerate(meilleures_opportunites, 1):
             message += f"<b>{i}. {opti['nom']} ({opti['symbol']})</b>\n"
-            message += f"▪️ <b>Secteur identifié :</b> {opti['secteur']}\n"
+            message += f"▪️ <b>Secteur :</b> {opti['secteur']}\n"
             message += f"▪️ <b>Pays d'origine :</b> {opti['pays']}\n"
-            message += f"▪️ <b>Cotation (Bourse) :</b> {opti['bourse']}\n"
-            message += f"▪️ <b>Prix actuel :</b> {opti['prix']}\n"
+            message += f"▪️ <b>Cotation :</b> {opti['bourse']}\n"
+            message += f"▪️ <b>Prix actuel :</b> {opti['prix']}$\n"
             message += f"▪️ <b>RSI (14) :</b> 🟢 <b>{opti['rsi']}</b>\n"
-            message += f"▪️ <b>Score Fondamental :</b> <b>{opti['score']}/100</b>\n\n"
+            message += f"▪️ <b>Score de Qualité :</b> <b>{opti['score']}/100</b>\n\n"
             
         envoyer_telegram(message)
     else:
-        print("Scan terminé : Aucun signal qualifié sur le marché mondial actuellement.")
+        print("Aucun signal qualifié (RSI < 30) sur les secteurs cibles lors de ce scan.")
 
 if __name__ == "__main__":
     executer_scan()
