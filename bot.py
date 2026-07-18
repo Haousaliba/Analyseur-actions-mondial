@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import os
 import requests
 import yfinance as yf
@@ -82,8 +85,6 @@ def generer_liste_tickers_dynamique():
     tickers = set()
     try:
         url_sp500 = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-        
-        # Simuler un navigateur web pour éviter le blocage HTTP 403 Forbidden
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
         response = requests.get(url_sp500, headers=headers, timeout=10)
         
@@ -140,7 +141,7 @@ def executer_scan():
     secteurs_cibles = recuperer_secteurs_cibles()
     deja_alertes = charger_alertes_deja_envoyees()
     
-    print("🔄 Scan en cours (Filtre RSI < 35)...")
+    print("🔄 Scan en cours (Filtre RSI < 35 + Calcul SL/TP)...")
     tickers = generer_liste_tickers_dynamique()
     opportunites = []
     
@@ -150,13 +151,13 @@ def executer_scan():
             
         try:
             ticker = yf.Ticker(symbol)
-            hist = ticker.history(period="3mo") # Télécharge par défaut les bougies de 1 jour
+            hist = ticker.history(period="3mo")
             if len(hist) < 20: continue
             
+            # Calcul du RSI
             rsi_series = ta.momentum.rsi(hist['Close'], window=14)
             rsi_actuel = rsi_series.iloc[-1]
             
-            # CONSIGNE : RSI strictement inférieur à 35
             if rsi_actuel < 35:
                 info = ticker.info
                 secteur_brut = info.get('industry', 'Autre') or 'Autre'
@@ -165,8 +166,22 @@ def executer_scan():
                 if appartient_aux_secteurs:
                     score = evaluer_action(info, contexte_macro)
                     
-                    # Filtrage pour ne garder que des entreprises solides
                     if score >= 55:
+                        prix_actuel = hist['Close'].iloc[-1]
+                        
+                        # Calcul de l'ATR pour définir un SL et TP précis selon la volatilité
+                        atr_series = ta.volatility.average_true_range(hist['High'], hist['Low'], hist['Close'], window=14)
+                        atr_actuel = atr_series.iloc[-1]
+                        
+                        # Stratégie de gestion des risques (Ratio 1:2)
+                        stop_loss = prix_actuel - (2 * atr_actuel)
+                        take_profit = prix_actuel + (4 * atr_actuel)
+                        
+                        # Récupération de la devise (par défaut $ si non trouvée)
+                        devise = info.get('currency', '$')
+                        if devise == "USD": devise = "$"
+                        elif devise == "EUR": devise = "€"
+                        
                         opportunites.append({
                             "symbol": symbol,
                             "nom": info.get('longName', symbol),
@@ -175,7 +190,10 @@ def executer_scan():
                             "pays": info.get('country', 'Inconnu'),
                             "rsi": round(rsi_actuel, 2),
                             "score": score,
-                            "prix": round(hist['Close'].iloc[-1], 2)
+                            "prix": round(prix_actuel, 2),
+                            "sl": round(stop_loss, 2),
+                            "tp": round(take_profit, 2),
+                            "devise": devise
                         })
         except:
             continue
@@ -192,17 +210,18 @@ def executer_scan():
         for i, opti in enumerate(meilleures_opportunites, 1):
             message += f"<b>{i}. {opti['nom']} ({opti['symbol']})</b>\n"
             message += f"▪️ <b>Secteur :</b> {opti['secteur']}\n"
-            message += f"▪️ <b>Pays d'origine :</b> {opti['pays']}\n"
-            message += f"▪️ <b>Cotation :</b> {opti['bourse']}\n"
-            message += f"▪️ <b>Prix actuel :</b> {opti['prix']}$\n"
             message += f"▪️ <b>RSI (14) Daily :</b> 🟢 <b>{opti['rsi']}</b>\n"
-            message += f"▪️ <b>Score de Qualité :</b> <b>{opti['score']}/100</b>\n\n"
+            message += f"▪️ <b>Score de Qualité :</b> <b>{opti['score']}/100</b>\n"
+            message += f"-----------------------------------------\n"
+            message += f"🟢 <b>Prix d'entrée Max :</b> {opti['prix']} {opti['devise']}\n"
+            message += f"🔴 <b>Stop Loss (SL) :</b> {opti['sl']} {opti['devise']}\n"
+            message += f"🔵 <b>Take Profit (TP) :</b> {opti['tp']} {opti['devise']}\n\n"
             tickers_a_enregistrer.append(opti['symbol'])
             
         envoyer_telegram(message)
         enregistrer_nouvelles_alertes(tickers_a_enregistrer)
     else:
-        print("Aucune opportunité sous un RSI de 35 n'a été trouvée lors de ce scan.")
+        print("Aucune opportunité sous un RSI de 35 avec un score suffisant n'a été trouvée.")
 
 if __name__ == "__main__":
     executer_scan()
