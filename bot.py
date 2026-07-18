@@ -82,9 +82,15 @@ def generer_liste_tickers_dynamique():
     tickers = set()
     try:
         url_sp500 = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-        tables = pd.read_html(url_sp500)
+        
+        # Simuler un navigateur web pour éviter le blocage HTTP 403 Forbidden
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+        response = requests.get(url_sp500, headers=headers, timeout=10)
+        
+        tables = pd.read_html(response.text)
         sp500_df = tables[0]
         tickers.update(sp500_df['Symbol'].tolist())
+        print(f"✅ {len(sp500_df)} tickers récupérés avec succès depuis le S&P 500.")
     except Exception as e:
         print(f"Erreur récupération S&P 500 : {e}")
         
