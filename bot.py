@@ -66,59 +66,60 @@ def generer_liste_tickers_dynamique():
     Génère dynamiquement une large liste de tickers en téléchargeant 
     les composants majeurs des grands indices mondiaux via Wikipédia.
     """
+    import io # Ajouté pour aider Pandas à lire le texte brut sans erreur
+
     tickers = set()
     
-    # Dictionnaire des indices à scraper.
-    # Format -> "Nom": ("URL Wikipedia", "Nom de la colonne", "Suffixe Yahoo Finance")
     indices_wiki = {
         "S&P 500": ("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies", "Symbol", ""),
         "NASDAQ 100": ("https://en.wikipedia.org/wiki/Nasdaq-100", "Ticker", ""),
         "CAC 40": ("https://en.wikipedia.org/wiki/CAC_40", "Ticker", ""),
         "DAX 40": ("https://en.wikipedia.org/wiki/DAX", "Ticker", ""),
-        "FTSE 100": ("https://en.wikipedia.org/wiki/FTSE_100_Index", "Ticker", ".L") # .L pour la bourse de Londres
+        "FTSE 100": ("https://en.wikipedia.org/wiki/FTSE_100_Index", "Ticker", ".L")
+    }
+    
+    # Le "déguisement" : on fait croire à Wikipédia qu'on utilise un navigateur standard
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
     
     # 1. Récupération automatique des indices via Wikipédia
     for nom_indice, (url, colonne, suffixe) in indices_wiki.items():
         try:
-            # pd.read_html lit tous les tableaux présents sur la page web
-            tables = pd.read_html(url)
+            # On utilise requests avec notre déguisement (headers)
+            reponse = requests.get(url, headers=headers, timeout=10)
             
-            # On cherche le tableau qui contient la bonne colonne (Ticker ou Symbol)
+            # On donne le code de la page récupérée à pandas pour trouver les tableaux
+            tables = pd.read_html(io.StringIO(reponse.text))
+            
             for df in tables:
                 if colonne in df.columns:
                     liste_brute = df[colonne].dropna().astype(str).tolist()
                     
                     for t in liste_brute:
-                        t = t.strip() # Enlever les espaces invisibles
+                        t = t.strip() 
                         
-                        # Nettoyage spécial pour les actions US (ex: Berkshire Hathaway 'BRK.B' devient 'BRK-B' sur Yahoo)
                         if suffixe == "" and "." in t and not t.endswith(('.PA', '.DE')):
                             t = t.replace(".", "-")
                             
-                        # Ajout du suffixe si nécessaire (Londres a besoin de .L sur Yahoo Finance)
                         if suffixe and not t.endswith(suffixe):
                             t = f"{t}{suffixe}"
                             
                         tickers.add(t)
                     
                     print(f"✅ {nom_indice} : Récupéré avec succès.")
-                    break # On passe à l'indice suivant
+                    break 
         except Exception as e:
             print(f"❌ Erreur récupération {nom_indice} : {e}")
 
     # 2. Ajout manuel pour les marchés sans tableaux Wikipédia propres
     grandes_valeurs_monde = [
-        # Nikkei 225 (Nécessite le suffixe .T pour Tokyo sur Yahoo Finance)
         "7203.T", "9984.T", "6758.T", "8035.T", "6861.T", "9983.T", 
-        # Reste de l'Europe (Suisse, Pays-Bas, etc.)
         "NESN.SW", "NOVN.SW", "ROG.SW", "ASML.AS", "ADYEN.AS", "MC.PA",
-        # Australie
         "BHP.AX", "CBA.AX", "CSL.AX", "RIO.AX"
     ]
     tickers.update(grandes_valeurs_monde)
     
-    # On supprime les éventuels doublons en convertissant le set en liste
     return list(tickers)
 
 def evaluer_action(info, contexte_macro):
