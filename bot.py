@@ -4,6 +4,7 @@ import yfinance as yf
 import pandas as pd
 import ta
 from datetime import datetime
+import io
 
 TOKEN = os.getenv("TOKEN_TELEGRAM")
 CHAT_ID = os.getenv("CHAT_ID")
@@ -66,8 +67,6 @@ def generer_liste_tickers_dynamique():
     Génère dynamiquement une large liste de tickers en téléchargeant 
     les composants majeurs des grands indices mondiaux via Wikipédia.
     """
-    import io # Ajouté pour aider Pandas à lire le texte brut sans erreur
-
     tickers = set()
     
     indices_wiki = {
@@ -182,8 +181,7 @@ def executer_scan():
     for symbol in tickers:
         try:
             ticker = yf.Ticker(symbol)
-            # CHANGEMENT 1 : On télécharge 1 an d'historique (au lieu de 3 mois) 
-            # pour pouvoir calculer une moyenne sur 200 jours.
+            # On télécharge 1 an d'historique pour pouvoir calculer une moyenne sur 200 jours.
             hist = ticker.history(period="1y")
             if len(hist) < 200: continue
             
@@ -193,11 +191,11 @@ def executer_scan():
             rsi_series = ta.momentum.rsi(hist['Close'], window=14)
             rsi_actuel = rsi_series.iloc[-1]
             
-            # NOUVEAU : Calcul de la Moyenne Mobile Simple (SMA 200)
+            # Calcul de la Moyenne Mobile Simple (SMA 200)
             sma_200_series = ta.trend.sma_indicator(hist['Close'], window=200)
             sma_200_actuel = sma_200_series.iloc[-1]
             
-            # CHANGEMENT 2 : LE DOUBLE FILTRE STRICT
+            # LE DOUBLE FILTRE STRICT
             # 1. Le RSI est inférieur à 35 (Repli court terme)
             # 2. Le prix est SUPÉRIEUR à la moyenne mobile 200 (Tendance de fond haussière)
             if rsi_actuel < 35 and prix_actuel > sma_200_actuel:
