@@ -182,19 +182,28 @@ def executer_scan():
     for symbol in tickers:
         try:
             ticker = yf.Ticker(symbol)
-            hist = ticker.history(period="3mo")
-            if len(hist) < 20: continue
+            # CHANGEMENT 1 : On télécharge 1 an d'historique (au lieu de 3 mois) 
+            # pour pouvoir calculer une moyenne sur 200 jours.
+            hist = ticker.history(period="1y")
+            if len(hist) < 200: continue
+            
+            prix_actuel = hist['Close'].iloc[-1]
             
             # Calcul du RSI (14)
             rsi_series = ta.momentum.rsi(hist['Close'], window=14)
             rsi_actuel = rsi_series.iloc[-1]
             
-            # FILTRE STRICT : RSI < 30 (Survente)
-            if rsi_actuel < 30:
+            # NOUVEAU : Calcul de la Moyenne Mobile Simple (SMA 200)
+            sma_200_series = ta.trend.sma_indicator(hist['Close'], window=200)
+            sma_200_actuel = sma_200_series.iloc[-1]
+            
+            # CHANGEMENT 2 : LE DOUBLE FILTRE STRICT
+            # 1. Le RSI est inférieur à 35 (Repli court terme)
+            # 2. Le prix est SUPÉRIEUR à la moyenne mobile 200 (Tendance de fond haussière)
+            if rsi_actuel < 35 and prix_actuel > sma_200_actuel:
                 info = ticker.info
                 secteur_brut = info.get('industry', 'Autre') or 'Autre'
                 
-                # Vérification : Est-ce que l'action appartient à l'un de nos 20 secteurs ?
                 appartient_aux_secteurs = any(sec in secteur_brut.lower() for sec in secteurs_cibles)
                 
                 if appartient_aux_secteurs:
@@ -208,33 +217,30 @@ def executer_scan():
                         "pays": info.get('country', 'Inconnu'),
                         "rsi": round(rsi_actuel, 2),
                         "score": score,
-                        "prix": round(hist['Close'].iloc[-1], 2)
+                        "prix": round(prix_actuel, 2),
+                        "distance_sma": round(((prix_actuel - sma_200_actuel) / sma_200_actuel) * 100, 2) # Pourcentage au-dessus de la SMA
                     })
         except Exception as e:
-            # On ignore silencieusement les erreurs d'API sur les tickers invalides
             continue
 
-    # Filtrer et trier pour ne garder que les 5 MEILLEURES opportunités
     meilleures_opportunites = sorted(opportunites, key=lambda x: x['score'], reverse=True)[:5]
     
     if meilleures_opportunites:
         maintenant = datetime.now().strftime('%Y-%m-%d %H:%M')
         message = f"<b>🔔 RADAR MARCHÉ DYNAMIQUE - {maintenant}</b>\n"
         message += f"<i>{contexte_macro['synthese']}</i>\n\n"
-        message += f"<b>🎯 TOP 5 DES OPPORTUNITÉS DÉCOUVERTES (RSI < 30) :</b>\n\n"
+        message += f"<b>🎯 TOP 5 DES OPPORTUNITÉS (RSI < 35 & Tendance Haussière) :</b>\n\n"
         
         for i, opti in enumerate(meilleures_opportunites, 1):
             message += f"<b>{i}. {opti['nom']} ({opti['symbol']})</b>\n"
             message += f"▪️ <b>Secteur :</b> {opti['secteur']}\n"
-            message += f"▪️ <b>Pays d'origine :</b> {opti['pays']}\n"
-            message += f"▪️ <b>Cotation :</b> {opti['bourse']}\n"
-            message += f"▪️ <b>Prix actuel :</b> {opti['prix']}$\n"
+            message += f"▪️ <b>Prix actuel :</b> {opti['prix']}$ (<i>+{opti['distance_sma']}% de la SMA200</i>)\n"
             message += f"▪️ <b>RSI (14) :</b> 🟢 <b>{opti['rsi']}</b>\n"
             message += f"▪️ <b>Score de Qualité :</b> <b>{opti['score']}/100</b>\n\n"
             
         envoyer_telegram(message)
     else:
-        print("Aucun signal qualifié (RSI < 30) sur les secteurs cibles lors de ce scan.")
+        print("Aucun signal qualifié (RSI < 35 + Prix > SMA200) lors de ce scan.")
 
 if __name__ == "__main__":
     executer_scan()
