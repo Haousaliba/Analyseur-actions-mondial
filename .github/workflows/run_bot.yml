@@ -2,9 +2,9 @@ name: Analyseur Sectoriel Continu
 
 on:
   schedule:
-    # CONSIGNE : Exécution toutes les heures, du lundi au vendredi
-    - cron: '0 * * * 1-5'
-  workflow_dispatch: # Permet toujours le déclenchement manuel si besoin
+    # Exécution toutes les 3 heures, 7 jours sur 7, 24h/24
+    - cron: '0 */3 * * *'
+  workflow_dispatch: # Permet de le lancer manuellement quand tu veux
 
 jobs:
   run-bot:
