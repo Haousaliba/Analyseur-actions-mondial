@@ -3,7 +3,6 @@ import requests
 import yfinance as yf
 import datetime
 import os
-import sys
 import argparse
 
 # Configuration des variables d'environnement
@@ -16,35 +15,25 @@ def recuperer_tickers(region):
     
     try:
         if region == "US":
-            # S&P 500
             tickers += pd.read_html(requests.get("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies", headers=headers).text)[0]['Symbol'].tolist()
-            # Dow Jones
             tickers += pd.read_html(requests.get("https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average", headers=headers).text)[1]['Symbol'].tolist()
-            # Nasdaq 100
             tickers += pd.read_html(requests.get("https://en.wikipedia.org/wiki/Nasdaq-100", headers=headers).text)[4]['Ticker'].tolist()
             
         elif region == "EU":
-            # CAC 40
             tickers += [f"{t}.PA" for t in pd.read_html(requests.get("https://en.wikipedia.org/wiki/CAC_40", headers=headers).text)[4]['Ticker'].tolist()]
-            # DAX
             tickers += [f"{t}.DE" for t in pd.read_html(requests.get("https://en.wikipedia.org/wiki/DAX", headers=headers).text)[4]['Ticker'].tolist()]
-            # FTSE 100
             tickers += [f"{t}.L" for t in pd.read_html(requests.get("https://en.wikipedia.org/wiki/FTSE_100_Index", headers=headers).text)[4]['Ticker'].tolist()]
-            # Euro Stoxx 50
             tickers += [f"{t}" for t in pd.read_html(requests.get("https://en.wikipedia.org/wiki/Euro_Stoxx_50", headers=headers).text)[4]['Ticker'].tolist()]
             
         elif region == "AU":
-            # ASX 200
             asx = pd.read_html(requests.get("https://en.wikipedia.org/wiki/List_of_S%26P/ASX_200_companies", headers=headers).text)[0]['Ticker'].tolist()
             tickers += [f"{t}.AX" for t in asx]
             
         elif region == "ASIA":
-            # Sélection qualitative des plus grandes valeurs asiatiques (Nikkei, Hang Seng, Nifty)
             tickers += ["6758.T", "8035.T", "9984.T", "7203.T", "0992.HK", "0700.HK", "3690.HK", "RELIANCE.NS", "TCS.NS", "INFY.NS"]
     except Exception as e:
         print(f"⚠️ Erreur lors de la récupération des indices pour la région {region}: {e}")
         
-    # Nettoyage basique des formats de tickers pour Yahoo Finance
     cleaned_tickers = []
     for t in tickers:
         t_str = str(t).strip().replace('.', '-') if not any(ext in str(t) for ext in ['.AX', '.PA', '.AS', '.DE', '.T', '.L', '.NS', '.HK']) else str(t).strip()
@@ -55,9 +44,7 @@ def recuperer_tickers(region):
 def classifier_secteur(info, ticker):
     sector = info.get('sector', '').lower()
     industry = info.get('industry', '').lower()
-    long_name = info.get('longName', ticker)
     
-    # Cartographie de tes secteurs stratégiques cibles
     if "semiconductor" in industry or "semiconductor" in sector:
         return "🔌 Semi-conducteurs", f"PER: {info.get('trailingPE', 'N/A')} | Marge Brute: {info.get('grossMargins', 0)*100:.1f}%"
     elif "software" in industry and "security" in industry:
@@ -125,7 +112,6 @@ if __name__ == "__main__":
     radar = recuperer_tickers(args.region)
     print(f"🎯 Fichier d'analyse chargé avec {len(radar)} actions cibles.")
     
-    # Traitement par paquets pour éviter les blocages API
     for i in range(0, len(radar), 30):
         paquet = radar[i:i+30]
         try:
@@ -139,7 +125,6 @@ if __name__ == "__main__":
                     if len(df) < 20: 
                         continue
                     
-                    # Calcul rapide du RSI
                     delta = df['Close'].diff()
                     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
                     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
@@ -148,7 +133,6 @@ if __name__ == "__main__":
                     prix_actuel = df['Close'].iloc[-1]
                     volume_moyen = df['Volume'].mean()
                     
-                    # Filtrage sur niveau de survente modérée (RSI inférieur à 38)
                     if rsi < 38 and volume_moyen > 30000:
                         action_info = yf.Ticker(ticker)
                         secteur, metriques = classifier_secteur(action_info.info, ticker)
