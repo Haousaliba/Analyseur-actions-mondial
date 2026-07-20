@@ -1,28 +1,49 @@
-name: Analyseur Sectoriel Continu
+name: Système de Scan Boursier Mondial Automatisé
 
 on:
   schedule:
-    - cron: '0 * * * *'  # S'exécute automatiquement TOUTES LES HEURES, 24h/24
-  workflow_dispatch:     # Permet de lancer le scan manuellement quand tu veux
+    # Rappel : Les heures sont basées sur le fuseau UTC (Heure de Londres sans décalage d'été)
+    - cron: '30 0 * * 1-5'  # Marchés Asiatiques (Scan à la clôture de Tokyo/Hong-Kong, ~8h30 heure de Paris)
+    - cron: '0 7 * * 1-5'   # Marché Australien (Scan à la clôture de l'ASX, ~9h00 heure de Paris)
+    - cron: '30 16 * * 1-5' # Marchés Européens (Scan juste avant la clôture européenne, 17h30 heure de Paris)
+    - cron: '30 20 * * 1-5' # Marchés Américains (Scan juste avant la clôture de Wall Street, 21h30 heure de Paris)
+  workflow_dispatch: # Permet de lancer manuellement n'importe quel scan depuis l'interface GitHub
 
 jobs:
-  run-bot:
+  run-scanner:
     runs-on: ubuntu-latest
     steps:
-      - name: Récupérer le code du dépôt
-        uses: actions/checkout@v4  # Passer à @v4 utilise Node.js 20/24 proprement 🚀
+      - name: Récupération du dépôt de code
+        uses: actions/checkout@v4
 
-      - name: Configurer Python
-        uses: actions/setup-python@v5  # Passer à @v5 utilise Node.js 20/24 proprement 🚀
+      - name: Configuration de l'environnement Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Installer les bibliothèques boursières
+      - name: Installation des dépendances requises
         run: |
-          pip install yfinance pandas requests lxml
+          python -m pip install --upgrade pip
+          pip install pandas yfinance requests lxml
 
-      - name: Exécuter l'Analyse Mondiale
+      - name: Détermination automatique de la zone horaire
+        id: select-region
+        run: |
+          if [ "${{ github.event_schedule }}" = "30 0 * * 1-5" ]; then
+            echo "region=ASIA" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_schedule }}" = "0 7 * * 1-5" ]; then
+            echo "region=AU" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_schedule }}" = "30 16 * * 1-5" ]; then
+            echo "region=EU" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_schedule }}" = "30 20 * * 1-5" ]; then
+            echo "region=US" >> $GITHUB_OUTPUT
+          else
+            echo "region=US" >> $GITHUB_OUTPUT # Valeur par défaut lors d'un lancement manuel
+          fi
+
+      - name: Exécution de l'analyse financière
         env:
           TOKEN_TELEGRAM: ${{ secrets.TOKEN_TELEGRAM }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python bot.py
+        run: |
+          python scanner.py --region ${{ steps.select-region.outputs.region }}
