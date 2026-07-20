@@ -2,12 +2,12 @@ name: Système de Scan Boursier Mondial Automatisé
 
 on:
   schedule:
-    # Rappel : Les heures sont basées sur le fuseau UTC (Heure de Londres sans décalage d'été)
-    - cron: '30 0 * * 1-5'  # Marchés Asiatiques (Scan à la clôture de Tokyo/Hong-Kong, ~8h30 heure de Paris)
-    - cron: '0 7 * * 1-5'   # Marché Australien (Scan à la clôture de l'ASX, ~9h00 heure de Paris)
-    - cron: '30 16 * * 1-5' # Marchés Européens (Scan juste avant la clôture européenne, 17h30 heure de Paris)
-    - cron: '30 20 * * 1-5' # Marchés Américains (Scan juste avant la clôture de Wall Street, 21h30 heure de Paris)
-  workflow_dispatch: # Permet de lancer manuellement n'importe quel scan depuis l'interface GitHub
+    # Heures basées sur le fuseau UTC (Heure universelle)
+    - cron: '30 0 * * 1-5'  # Marchés Asiatiques (Tokyo/Hong-Kong, ~8h30 heure de Paris)
+    - cron: '0 7 * * 1-5'   # Marché Australien (ASX, ~9h00 heure de Paris)
+    - cron: '30 16 * * 1-5' # Marchés Européens (Juste avant la clôture, 17h30 heure de Paris)
+    - cron: '30 20 * * 1-5' # Marchés Américains (Juste avant la clôture de Wall Street, 21h30 heure de Paris)
+  workflow_dispatch: # Permet de forcer manuellement le lancement depuis GitHub
 
 jobs:
   run-scanner:
@@ -38,7 +38,7 @@ jobs:
           elif [ "${{ github.event_schedule }}" = "30 20 * * 1-5" ]; then
             echo "region=US" >> $GITHUB_OUTPUT
           else
-            echo "region=US" >> $GITHUB_OUTPUT # Valeur par défaut lors d'un lancement manuel
+            echo "region=US" >> $GITHUB_OUTPUT # Valeur par défaut pour l'exécution manuelle
           fi
 
       - name: Exécution de l'analyse financière
@@ -46,4 +46,4 @@ jobs:
           TOKEN_TELEGRAM: ${{ secrets.TOKEN_TELEGRAM }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: |
-          python scanner.py --region ${{ steps.select-region.outputs.region }}
+          python bot.py --region ${{ steps.select-region.outputs.region }}
